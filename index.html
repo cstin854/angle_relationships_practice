@@ -46,7 +46,25 @@
         .question-text {
             font-size: 1.25rem;
             font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .dropdown-group {
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: var(--border-radius);
             margin-bottom: 20px;
+            text-align: left;
+            font-weight: 500;
+        }
+        .dropdown-group select {
+            width: 100%;
+            padding: 10px;
+            font-size: 1rem;
+            margin-top: 10px;
+            border-radius: var(--border-radius);
+            border: 1px solid #cbd5e1;
+            background: white;
+            cursor: pointer;
         }
         .controls {
             display: flex;
@@ -95,6 +113,25 @@
             color: #991b1b;
             display: block;
         }
+
+        .stats-panel {
+            background: #e2e8f0;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin-top: 25px;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+        .stats-panel h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+            color: #334155;
+        }
+        .stats-panel p {
+            margin: 5px 0;
+            font-weight: 500;
+        }
         
         /* SVG Styling */
         line { stroke: #334155; stroke-width: 3; }
@@ -109,13 +146,33 @@
     <svg id="canvas" width="400" height="400" viewBox="0 0 400 400"></svg>
     
     <div id="feedback" class="feedback"></div>
+    
     <div class="question-text" id="question"></div>
+    
+    <div class="dropdown-group">
+        <label>The angle relationship between Angle <span id="lbl-given"></span> and Angle <span id="lbl-target"></span> is:</label>
+        <select id="rel-select">
+            <option value="">-- Select Relationship --</option>
+            <option value="vertical">Vertical Angles</option>
+            <option value="linear">Straight Angle Pair</option>
+            <option value="corresponding">Corresponding Angles</option>
+            <option value="alternate_interior">Alternate Interior Angles</option>
+            <option value="same_side_interior">Same-Side Interior Angles</option>
+        </select>
+    </div>
     
     <div class="controls">
         <input type="number" id="degree-input" placeholder="Degrees°">
         <button id="submit-btn">Submit Measure</button>
         <button id="cbd-btn">Cannot be determined</button>
-        <button id="skip-btn">Skip / New Problem</button>
+        <button id="skip-btn">Next Problem</button>
+    </div>
+
+    <div class="stats-panel" id="stats-panel" style="display: none;">
+        <h3>Session Stats (Last 30 Attempts)</h3>
+        <p>Relationship Accuracy: <span id="stat-rel-acc">0%</span></p>
+        <p>Measure Accuracy: <span id="stat-meas-acc">0%</span></p>
+        <p>Needing review: <strong id="stat-review" style="color: #b91c1c;">None</strong></p>
     </div>
 </div>
 
@@ -124,8 +181,21 @@
     const questionEl = document.getElementById('question');
     const degreeInput = document.getElementById('degree-input');
     const feedbackEl = document.getElementById('feedback');
+    const relSelect = document.getElementById('rel-select');
+    const lblGiven = document.getElementById('lbl-given');
+    const lblTarget = document.getElementById('lbl-target');
+    const statsPanel = document.getElementById('stats-panel');
 
     let currentProblem = null;
+    let attemptHistory = []; // Array to hold last 30 problem results
+
+    const relNames = {
+        'vertical': 'Vertical Angles',
+        'linear': 'Straight Angle Pair',
+        'corresponding': 'Corresponding Angles',
+        'alternate_interior': 'Alternate Interior Angles',
+        'same_side_interior': 'Same-Side Interior Angles'
+    };
 
     function getRandomInt(min, max) {
         return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -136,7 +206,7 @@
         let anglesData = [];
         
         if (type === 0) {
-            // SINGLE INTERSECTION (4 Angles)
+            // SINGLE INTERSECTION
             canvas.innerHTML += `<line x1="50" y1="200" x2="350" y2="200" />`;
             canvas.innerHTML += `<line x1="120" y1="320" x2="280" y2="80" />`;
             
@@ -156,12 +226,11 @@
             ];
             
         } else if (type === 1) {
-            // PARALLEL TRANSVERSAL (8 Angles)
+            // PARALLEL TRANSVERSAL
             canvas.innerHTML += `<line x1="50" y1="150" x2="350" y2="150" />`;
             canvas.innerHTML += `<line x1="50" y1="280" x2="350" y2="280" />`;
             canvas.innerHTML += `<line x1="120" y1="50" x2="250" y2="350" />`;
             
-            // Red arrows indicating parallel lines
             canvas.innerHTML += `
                 <path class="parallel-marker" d="M 320 140 L 330 150 L 320 160" />
                 <path class="parallel-marker" d="M 320 270 L 330 280 L 320 290" />
@@ -192,7 +261,7 @@
             ];
             
         } else {
-            // NON-PARALLEL TRANSVERSAL (8 Angles)
+            // NON-PARALLEL TRANSVERSAL
             canvas.innerHTML += `<line x1="50" y1="120" x2="350" y2="180" />`;
             canvas.innerHTML += `<line x1="50" y1="280" x2="350" y2="250" />`;
             canvas.innerHTML += `<line x1="120" y1="50" x2="280" y2="350" />`;
@@ -230,106 +299,36 @@
         return { type, anglesData };
     }
 
-    // Helper to determine the geometric relationship between two angle letters
-    function getRelationshipDetails(id1, id2, type) {
+    function getRelationship(id1, id2) {
         const pair = [id1, id2].sort().join('');
         
-        // 1. Same Intersection
-        const verticalPairs = ['AC', 'BD', 'EG', 'FH'];
-        if (verticalPairs.includes(pair)) {
-            return {
-                name: 'vertical angles',
-                type: 'congruent',
-                text: `Angle ${id1} and Angle ${id2} are vertical angles, so they are always congruent (equal in measure).`
-            };
-        }
+        if (['AC', 'BD', 'EG', 'FH'].includes(pair)) return 'vertical';
+        if (['AB', 'AD', 'BC', 'CD', 'EF', 'EH', 'FG', 'GH'].includes(pair)) return 'linear';
+        if (['AE', 'BF', 'CG', 'DH'].includes(pair)) return 'corresponding';
+        if (['CE', 'DF'].includes(pair)) return 'alternate_interior';
+        if (['CF', 'DE'].includes(pair)) return 'same_side_interior';
         
-        const sameGroup1 = ['A','B','C','D'].includes(id1) && ['A','B','C','D'].includes(id2);
-        const sameGroup2 = ['E','F','G','H'].includes(id1) && ['E','F','G','H'].includes(id2);
-        if (sameGroup1 || sameGroup2) {
-            return {
-                name: 'a linear pair (straight angle pair)',
-                type: 'supplementary',
-                text: `Angle ${id1} and Angle ${id2} form a linear pair on a straight line, so they are always supplementary (sum to 180°).`
-            };
-        }
-        
-        // 2. Different Intersections across non-parallel lines
-        if (type === 2) {
-            let relName = 'angles across different intersections';
-            if (['AE', 'BF', 'CG', 'DH'].includes(pair)) relName = 'corresponding angles';
-            else if (['CE', 'DF'].includes(pair)) relName = 'alternate interior angles';
-            else if (['CF', 'DE'].includes(pair)) relName = 'same-side interior angles';
-            else if (['AG', 'BH'].includes(pair)) relName = 'alternate exterior angles';
-            else if (['AH', 'BG'].includes(pair)) relName = 'same-side exterior angles';
-
-            return {
-                name: relName,
-                type: 'undetermined',
-                text: `Angle ${id1} and Angle ${id2} are ${relName}. However, because the lines are NOT marked as parallel, no conclusions can be drawn about their measure relationship. Therefore, the measure cannot be determined.`
-            };
-        }
-        
-        // 3. Different Intersections across parallel lines
-        if (['AE', 'BF', 'CG', 'DH'].includes(pair)) {
-            return {
-                name: 'corresponding angles',
-                type: 'congruent',
-                text: `Angle ${id1} and Angle ${id2} are corresponding angles. Because the lines are marked as parallel, corresponding angles are congruent (equal in measure).`
-            };
-        }
-        if (['CE', 'DF'].includes(pair)) {
-            return {
-                name: 'alternate interior angles',
-                type: 'congruent',
-                text: `Angle ${id1} and Angle ${id2} are alternate interior angles. Because the lines are marked as parallel, alternate interior angles are congruent (equal in measure).`
-            };
-        }
-        if (['AG', 'BH'].includes(pair)) {
-            return {
-                name: 'alternate exterior angles',
-                type: 'congruent',
-                text: `Angle ${id1} and Angle ${id2} are alternate exterior angles. Because the lines are marked as parallel, alternate exterior angles are congruent (equal in measure).`
-            };
-        }
-        if (['CF', 'DE'].includes(pair)) {
-            return {
-                name: 'same-side interior angles',
-                type: 'supplementary',
-                text: `Angle ${id1} and Angle ${id2} are same-side interior angles. Because the lines are marked as parallel, same-side interior angles are supplementary (sum to 180°).`
-            };
-        }
-        if (['AH', 'BG'].includes(pair)) {
-            return {
-                name: 'same-side exterior angles',
-                type: 'supplementary',
-                text: `Angle ${id1} and Angle ${id2} are same-side exterior angles. Because the lines are marked as parallel, same-side exterior angles are supplementary (sum to 180°).`
-            };
-        }
-
-        return {
-            name: 'connected angle pair',
-            type: 'supplementary',
-            text: `Angle ${id1} and Angle ${id2} are connected via corresponding angles and a linear pair. Because the lines are parallel, they are supplementary (sum to 180°).`
-        };
+        return null;
     }
 
     function generateProblem() {
         feedbackEl.className = 'feedback';
         degreeInput.value = '';
+        relSelect.value = '';
         
-        // 0 = Single Intersection, 1 = Parallel Transversal, 2 = Non-Parallel Transversal
         const type = getRandomInt(0, 2);
         const data = drawProblem(type);
         
         const aIndex = getRandomInt(0, data.anglesData.length - 1);
-        let bIndex = getRandomInt(0, data.anglesData.length - 1);
-        while (bIndex === aIndex) {
-            bIndex = getRandomInt(0, data.anglesData.length - 1);
-        }
-        
         const givenAngle = data.anglesData[aIndex];
-        const targetAngle = data.anglesData[bIndex];
+        
+        const validTargets = data.anglesData.filter(t => {
+            if (t.id === givenAngle.id) return false;
+            return getRelationship(givenAngle.id, t.id) !== null;
+        });
+        
+        const targetAngle = validTargets[getRandomInt(0, validTargets.length - 1)];
+        const actualRelId = getRelationship(givenAngle.id, targetAngle.id);
         
         let isDeterminable = true;
         if (type === 2 && givenAngle.group !== targetAngle.group) {
@@ -337,49 +336,157 @@
         }
         
         currentProblem = {
+            type: type,
             givenId: givenAngle.id,
             givenVal: givenAngle.val,
+            givenGroup: givenAngle.group,
             targetId: targetAngle.id,
             targetVal: targetAngle.val,
+            targetGroup: targetAngle.group,
             isDeterminable: isDeterminable,
-            type: type
+            actualRelId: actualRelId,
+            logged: false // Prevents multiple submissions counting against stats
         };
         
         questionEl.textContent = `If m∠${currentProblem.givenId} = ${currentProblem.givenVal}°, what is m∠${currentProblem.targetId}?`;
+        lblGiven.textContent = currentProblem.givenId;
+        lblTarget.textContent = currentProblem.targetId;
+    }
+
+    function updateStatsPanel() {
+        if (attemptHistory.length === 0) return;
+        statsPanel.style.display = 'block';
+
+        let relCorrectCount = 0;
+        let measCorrectCount = 0;
+        let missedRelationships = {}; // Keep tally of which relationships they missed
+
+        attemptHistory.forEach(attempt => {
+            if (attempt.relCorrect) relCorrectCount++;
+            if (attempt.measureCorrect) measCorrectCount++;
+
+            // If they missed either the relationship or the measure, add it to the missed tally
+            if (!attempt.relCorrect || !attempt.measureCorrect) {
+                missedRelationships[attempt.actualRelId] = (missedRelationships[attempt.actualRelId] || 0) + 1;
+            }
+        });
+
+        const relAcc = Math.round((relCorrectCount / attemptHistory.length) * 100);
+        const measAcc = Math.round((measCorrectCount / attemptHistory.length) * 100);
+
+        document.getElementById('stat-rel-acc').textContent = `${relAcc}%`;
+        document.getElementById('stat-meas-acc').textContent = `${measAcc}%`;
+
+        // Find the most missed relationship
+        let worstRel = null;
+        let maxMisses = 0;
+
+        for (const [relId, count] of Object.entries(missedRelationships)) {
+            if (count > maxMisses) {
+                maxMisses = count;
+                worstRel = relId;
+            }
+        }
+
+        const reviewSpan = document.getElementById('stat-review');
+        if (worstRel && maxMisses > 0) {
+            reviewSpan.textContent = `[${relNames[worstRel].toLowerCase()}]`;
+        } else {
+            reviewSpan.textContent = 'None';
+        }
     }
 
     function checkAnswer(userChoice, userValue = null) {
         if (!currentProblem) return;
         
-        const rel = getRelationshipDetails(currentProblem.givenId, currentProblem.targetId, currentProblem.type);
+        const userRelId = relSelect.value;
+        if (!userRelId) {
+            alert("Please select the angle relationship from the dropdown first.");
+            return;
+        }
+        
+        const actualRelId = currentProblem.actualRelId;
+        const actualRelName = relNames[actualRelId];
+        const userRelName = relNames[userRelId];
+        const relCorrect = (userRelId === actualRelId);
+        
+        let measureCorrect = false;
         let isCorrect = false;
         let message = '';
         
+        let relExplanation = `Angle ${currentProblem.givenId} and Angle ${currentProblem.targetId} are <strong>${actualRelName}</strong>.`;
+        if (currentProblem.type === 2 && currentProblem.givenGroup !== currentProblem.targetGroup) {
+            relExplanation += ` However, because the lines are NOT marked as parallel, their exact measure relationship cannot be determined.`;
+        } else if (currentProblem.type === 1 && currentProblem.givenGroup !== currentProblem.targetGroup) {
+            relExplanation += ` Because the lines are marked as parallel, their measures can be calculated.`;
+        } else {
+            relExplanation += ` Since they share an intersection, you can always calculate their measures.`;
+        }
+        
         if (userChoice === 'cbd') {
+            measureCorrect = !currentProblem.isDeterminable;
+
             if (!currentProblem.isDeterminable) {
-                isCorrect = true;
-                message = `<strong>Correct!</strong> ${rel.text}`;
-            } else {
-                isCorrect = false;
-                message = `<strong>Incorrect.</strong> The measure CAN be determined. ${rel.text} The correct answer is <strong>${currentProblem.targetVal}°</strong>.`;
-            }
-        } else if (userChoice === 'measure') {
-            if (!currentProblem.isDeterminable) {
-                isCorrect = false;
-                message = `<strong>Incorrect.</strong> You entered ${userValue}°, but the answer is "Cannot be determined". ${rel.text}`;
-            } else {
-                if (userValue === currentProblem.targetVal) {
+                if (relCorrect) {
                     isCorrect = true;
-                    message = `<strong>Correct!</strong> m∠${currentProblem.targetId} = ${currentProblem.targetVal}°. ${rel.text}`;
+                    message = `<strong>Correct!</strong> ${relExplanation}`;
                 } else {
                     isCorrect = false;
-                    message = `<strong>Incorrect.</strong> You entered ${userValue}°, but m∠${currentProblem.targetId} = ${currentProblem.targetVal}°. ${rel.text}`;
+                    message = `<strong>Incorrect Relationship.</strong> You were correct that it "Cannot be determined", but they are NOT ${userRelName}. ${relExplanation}`;
+                }
+            } else {
+                isCorrect = false;
+                if (relCorrect) {
+                    message = `<strong>Incorrect Measure.</strong> You correctly identified them as ${userRelName}, but the measure CAN be determined! ${relExplanation} The correct answer is <strong>${currentProblem.targetVal}°</strong>.`;
+                } else {
+                    message = `<strong>Incorrect.</strong> The measure CAN be determined, and they are not ${userRelName}. ${relExplanation} The correct answer is <strong>${currentProblem.targetVal}°</strong>.`;
+                }
+            }
+        } else if (userChoice === 'measure') {
+            measureCorrect = (currentProblem.isDeterminable && userValue === currentProblem.targetVal);
+
+            if (!currentProblem.isDeterminable) {
+                isCorrect = false;
+                if (relCorrect) {
+                    message = `<strong>Incorrect Measure.</strong> You correctly identified them as ${userRelName}, but you provided a measure when it "Cannot be determined". ${relExplanation}`;
+                } else {
+                    message = `<strong>Incorrect.</strong> You entered ${userValue}°, but the answer is "Cannot be determined". Also, they are not ${userRelName}. ${relExplanation}`;
+                }
+            } else {
+                if (relCorrect && measureCorrect) {
+                    isCorrect = true;
+                    message = `<strong>Correct!</strong> m∠${currentProblem.targetId} = ${currentProblem.targetVal}°. ${relExplanation}`;
+                } else if (relCorrect && !measureCorrect) {
+                    isCorrect = false;
+                    message = `<strong>Incorrect Measure.</strong> You correctly identified them as ${userRelName}, but m∠${currentProblem.targetId} is <strong>${currentProblem.targetVal}°</strong>, not ${userValue}°. ${relExplanation}`;
+                } else if (!relCorrect && measureCorrect) {
+                    isCorrect = false;
+                    message = `<strong>Incorrect Relationship.</strong> You got the measure right (${currentProblem.targetVal}°), but they are NOT ${userRelName}. ${relExplanation}`;
+                } else {
+                    isCorrect = false;
+                    message = `<strong>Incorrect.</strong> You entered ${userValue}° and selected ${userRelName}. ${relExplanation} The correct answer is <strong>${currentProblem.targetVal}°</strong>.`;
                 }
             }
         }
         
         feedbackEl.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
         feedbackEl.innerHTML = message;
+
+        // Log to stats if it's the first time they submit this problem
+        if (!currentProblem.logged) {
+            currentProblem.logged = true;
+            attemptHistory.push({
+                relCorrect: relCorrect,
+                measureCorrect: measureCorrect,
+                actualRelId: actualRelId
+            });
+
+            // Keep only the last 30 attempts
+            if (attemptHistory.length > 30) {
+                attemptHistory.shift(); 
+            }
+            updateStatsPanel();
+        }
     }
 
     // Controls
