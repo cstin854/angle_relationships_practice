@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angle Relationships Practice</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+            --border-radius: 8px;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+        }
+        svg {
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            max-width: 100%;
+            height: auto;
+        }
+        .question-text {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        input[type="number"] {
+            padding: 10px;
+            font-size: 1rem;
+            border: 2px solid #cbd5e1;
+            border-radius: var(--border-radius);
+            width: 120px;
+        }
+        button {
+            padding: 10px 16px;
+            font-size: 1rem;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        #submit-btn { background-color: var(--primary); color: white; }
+        #cbd-btn { background-color: #dc2626; color: white; }
+        #skip-btn { background-color: #64748b; color: white; }
+        
+        .feedback {
+            padding: 15px;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            display: none;
+            margin-bottom: 15px;
+            text-align: left;
+            line-height: 1.4;
+        }
+        .feedback.correct {
+            background-color: #dcfce7;
+            color: #166534;
+            display: block;
+        }
+        .feedback.incorrect {
+            background-color: #fee2e2;
+            color: #991b1b;
+            display: block;
+        }
+        
+        /* SVG Styling */
+        line { stroke: #334155; stroke-width: 3; }
+        text { font-family: monospace; font-size: 20px; font-weight: bold; fill: var(--primary); }
+        .parallel-marker { fill: none; stroke: #dc2626; stroke-width: 3; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Angle Relationships Practice</h1>
+    <svg id="canvas" width="400" height="400" viewBox="0 0 400 400"></svg>
+    
+    <div id="feedback" class="feedback"></div>
+    <div class="question-text" id="question"></div>
+    
+    <div class="controls">
+        <input type="number" id="degree-input" placeholder="Degrees°">
+        <button id="submit-btn">Submit Measure</button>
+        <button id="cbd-btn">Cannot be determined</button>
+        <button id="skip-btn">Skip / New Problem</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const questionEl = document.getElementById('question');
+    const degreeInput = document.getElementById('degree-input');
+    const feedbackEl = document.getElementById('feedback');
+
+    let currentProblem = null;
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function drawProblem(type) {
+        canvas.innerHTML = '';
+        let anglesData = [];
+        
+        if (type === 0) {
+            // SINGLE INTERSECTION (4 Angles)
+            canvas.innerHTML += `<line x1="50" y1="200" x2="350" y2="200" />`;
+            canvas.innerHTML += `<line x1="120" y1="320" x2="280" y2="80" />`;
+            
+            canvas.innerHTML += `
+                <text x="215" y="185">A</text>
+                <text x="155" y="185">B</text>
+                <text x="165" y="235">C</text>
+                <text x="225" y="235">D</text>
+            `;
+            
+            const baseAngle = getRandomInt(40, 140);
+            anglesData = [
+                { id: 'A', group: 1, val: baseAngle },
+                { id: 'B', group: 1, val: 180 - baseAngle },
+                { id: 'C', group: 1, val: baseAngle },
+                { id: 'D', group: 1, val: 180 - baseAngle }
+            ];
+            
+        } else if (type === 1) {
+            // PARALLEL TRANSVERSAL (8 Angles)
+            canvas.innerHTML += `<line x1="50" y1="150" x2="350" y2="150" />`;
+            canvas.innerHTML += `<line x1="50" y1="280" x2="350" y2="280" />`;
+            canvas.innerHTML += `<line x1="120" y1="50" x2="250" y2="350" />`;
+            
+            // Red arrows indicating parallel lines
+            canvas.innerHTML += `
+                <path class="parallel-marker" d="M 320 140 L 330 150 L 320 160" />
+                <path class="parallel-marker" d="M 320 270 L 330 280 L 320 290" />
+            `;
+            
+            canvas.innerHTML += `
+                <text x="180" y="135">A</text>
+                <text x="135" y="135">B</text>
+                <text x="145" y="185">C</text>
+                <text x="190" y="185">D</text>
+                
+                <text x="235" y="265">E</text>
+                <text x="190" y="265">F</text>
+                <text x="200" y="315">G</text>
+                <text x="245" y="315">H</text>
+            `;
+            
+            const baseAngle = getRandomInt(40, 140);
+            anglesData = [
+                { id: 'A', group: 1, val: baseAngle },
+                { id: 'B', group: 1, val: 180 - baseAngle },
+                { id: 'C', group: 1, val: baseAngle },
+                { id: 'D', group: 1, val: 180 - baseAngle },
+                { id: 'E', group: 2, val: baseAngle },
+                { id: 'F', group: 2, val: 180 - baseAngle },
+                { id: 'G', group: 2, val: baseAngle },
+                { id: 'H', group: 2, val: 180 - baseAngle }
+            ];
+            
+        } else {
+            // NON-PARALLEL TRANSVERSAL (8 Angles)
+            canvas.innerHTML += `<line x1="50" y1="120" x2="350" y2="180" />`;
+            canvas.innerHTML += `<line x1="50" y1="280" x2="350" y2="250" />`;
+            canvas.innerHTML += `<line x1="120" y1="50" x2="280" y2="350" />`;
+            
+            canvas.innerHTML += `
+                <text x="185" y="125">A</text>
+                <text x="135" y="135">B</text>
+                <text x="155" y="185">C</text>
+                <text x="205" y="175">D</text>
+                
+                <text x="250" y="250">E</text>
+                <text x="195" y="265">F</text>
+                <text x="210" y="315">G</text>
+                <text x="265" y="300">H</text>
+            `;
+            
+            const topBase = getRandomInt(50, 130);
+            let bottomBase = getRandomInt(50, 130);
+            while (Math.abs(topBase - bottomBase) < 15) {
+                bottomBase = getRandomInt(50, 130);
+            }
+            
+            anglesData = [
+                { id: 'A', group: 1, val: topBase },
+                { id: 'B', group: 1, val: 180 - topBase },
+                { id: 'C', group: 1, val: topBase },
+                { id: 'D', group: 1, val: 180 - topBase },
+                { id: 'E', group: 2, val: bottomBase },
+                { id: 'F', group: 2, val: 180 - bottomBase },
+                { id: 'G', group: 2, val: bottomBase },
+                { id: 'H', group: 2, val: 180 - bottomBase }
+            ];
+        }
+        
+        return { type, anglesData };
+    }
+
+    // Helper to determine the geometric relationship between two angle letters
+    function getRelationshipDetails(id1, id2, type) {
+        const pair = [id1, id2].sort().join('');
+        
+        // 1. Same Intersection
+        const verticalPairs = ['AC', 'BD', 'EG', 'FH'];
+        if (verticalPairs.includes(pair)) {
+            return {
+                name: 'vertical angles',
+                type: 'congruent',
+                text: `Angle ${id1} and Angle ${id2} are vertical angles, so they are always congruent (equal in measure).`
+            };
+        }
+        
+        const sameGroup1 = ['A','B','C','D'].includes(id1) && ['A','B','C','D'].includes(id2);
+        const sameGroup2 = ['E','F','G','H'].includes(id1) && ['E','F','G','H'].includes(id2);
+        if (sameGroup1 || sameGroup2) {
+            return {
+                name: 'a linear pair (straight angle pair)',
+                type: 'supplementary',
+                text: `Angle ${id1} and Angle ${id2} form a linear pair on a straight line, so they are always supplementary (sum to 180°).`
+            };
+        }
+        
+        // 2. Different Intersections across non-parallel lines
+        if (type === 2) {
+            let relName = 'angles across different intersections';
+            if (['AE', 'BF', 'CG', 'DH'].includes(pair)) relName = 'corresponding angles';
+            else if (['CE', 'DF'].includes(pair)) relName = 'alternate interior angles';
+            else if (['CF', 'DE'].includes(pair)) relName = 'same-side interior angles';
+            else if (['AG', 'BH'].includes(pair)) relName = 'alternate exterior angles';
+            else if (['AH', 'BG'].includes(pair)) relName = 'same-side exterior angles';
+
+            return {
+                name: relName,
+                type: 'undetermined',
+                text: `Angle ${id1} and Angle ${id2} are ${relName}. However, because the lines are NOT marked as parallel, no conclusions can be drawn about their measure relationship. Therefore, the measure cannot be determined.`
+            };
+        }
+        
+        // 3. Different Intersections across parallel lines
+        if (['AE', 'BF', 'CG', 'DH'].includes(pair)) {
+            return {
+                name: 'corresponding angles',
+                type: 'congruent',
+                text: `Angle ${id1} and Angle ${id2} are corresponding angles. Because the lines are marked as parallel, corresponding angles are congruent (equal in measure).`
+            };
+        }
+        if (['CE', 'DF'].includes(pair)) {
+            return {
+                name: 'alternate interior angles',
+                type: 'congruent',
+                text: `Angle ${id1} and Angle ${id2} are alternate interior angles. Because the lines are marked as parallel, alternate interior angles are congruent (equal in measure).`
+            };
+        }
+        if (['AG', 'BH'].includes(pair)) {
+            return {
+                name: 'alternate exterior angles',
+                type: 'congruent',
+                text: `Angle ${id1} and Angle ${id2} are alternate exterior angles. Because the lines are marked as parallel, alternate exterior angles are congruent (equal in measure).`
+            };
+        }
+        if (['CF', 'DE'].includes(pair)) {
+            return {
+                name: 'same-side interior angles',
+                type: 'supplementary',
+                text: `Angle ${id1} and Angle ${id2} are same-side interior angles. Because the lines are marked as parallel, same-side interior angles are supplementary (sum to 180°).`
+            };
+        }
+        if (['AH', 'BG'].includes(pair)) {
+            return {
+                name: 'same-side exterior angles',
+                type: 'supplementary',
+                text: `Angle ${id1} and Angle ${id2} are same-side exterior angles. Because the lines are marked as parallel, same-side exterior angles are supplementary (sum to 180°).`
+            };
+        }
+
+        return {
+            name: 'connected angle pair',
+            type: 'supplementary',
+            text: `Angle ${id1} and Angle ${id2} are connected via corresponding angles and a linear pair. Because the lines are parallel, they are supplementary (sum to 180°).`
+        };
+    }
+
+    function generateProblem() {
+        feedbackEl.className = 'feedback';
+        degreeInput.value = '';
+        
+        // 0 = Single Intersection, 1 = Parallel Transversal, 2 = Non-Parallel Transversal
+        const type = getRandomInt(0, 2);
+        const data = drawProblem(type);
+        
+        const aIndex = getRandomInt(0, data.anglesData.length - 1);
+        let bIndex = getRandomInt(0, data.anglesData.length - 1);
+        while (bIndex === aIndex) {
+            bIndex = getRandomInt(0, data.anglesData.length - 1);
+        }
+        
+        const givenAngle = data.anglesData[aIndex];
+        const targetAngle = data.anglesData[bIndex];
+        
+        let isDeterminable = true;
+        if (type === 2 && givenAngle.group !== targetAngle.group) {
+            isDeterminable = false;
+        }
+        
+        currentProblem = {
+            givenId: givenAngle.id,
+            givenVal: givenAngle.val,
+            targetId: targetAngle.id,
+            targetVal: targetAngle.val,
+            isDeterminable: isDeterminable,
+            type: type
+        };
+        
+        questionEl.textContent = `If m∠${currentProblem.givenId} = ${currentProblem.givenVal}°, what is m∠${currentProblem.targetId}?`;
+    }
+
+    function checkAnswer(userChoice, userValue = null) {
+        if (!currentProblem) return;
+        
+        const rel = getRelationshipDetails(currentProblem.givenId, currentProblem.targetId, currentProblem.type);
+        let isCorrect = false;
+        let message = '';
+        
+        if (userChoice === 'cbd') {
+            if (!currentProblem.isDeterminable) {
+                isCorrect = true;
+                message = `<strong>Correct!</strong> ${rel.text}`;
+            } else {
+                isCorrect = false;
+                message = `<strong>Incorrect.</strong> The measure CAN be determined. ${rel.text} The correct answer is <strong>${currentProblem.targetVal}°</strong>.`;
+            }
+        } else if (userChoice === 'measure') {
+            if (!currentProblem.isDeterminable) {
+                isCorrect = false;
+                message = `<strong>Incorrect.</strong> You entered ${userValue}°, but the answer is "Cannot be determined". ${rel.text}`;
+            } else {
+                if (userValue === currentProblem.targetVal) {
+                    isCorrect = true;
+                    message = `<strong>Correct!</strong> m∠${currentProblem.targetId} = ${currentProblem.targetVal}°. ${rel.text}`;
+                } else {
+                    isCorrect = false;
+                    message = `<strong>Incorrect.</strong> You entered ${userValue}°, but m∠${currentProblem.targetId} = ${currentProblem.targetVal}°. ${rel.text}`;
+                }
+            }
+        }
+        
+        feedbackEl.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
+        feedbackEl.innerHTML = message;
+    }
+
+    // Controls
+    document.getElementById('submit-btn').addEventListener('click', () => {
+        const val = parseInt(degreeInput.value, 10);
+        if (isNaN(val)) {
+            alert("Please enter a degree measure.");
+            return;
+        }
+        checkAnswer('measure', val);
+    });
+
+    document.getElementById('cbd-btn').addEventListener('click', () => {
+        degreeInput.value = '';
+        checkAnswer('cbd');
+    });
+
+    document.getElementById('skip-btn').addEventListener('click', generateProblem);
+
+    // Initial setup
+    generateProblem();
+</script>
+
+</body>
+</html>
