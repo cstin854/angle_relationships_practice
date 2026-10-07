@@ -187,7 +187,7 @@
     const statsPanel = document.getElementById('stats-panel');
 
     let currentProblem = null;
-    let attemptHistory = []; // Array to hold last 30 problem results
+    let attemptHistory = [];
 
     const relNames = {
         'vertical': 'Vertical Angles',
@@ -195,6 +195,15 @@
         'corresponding': 'Corresponding Angles',
         'alternate_interior': 'Alternate Interior Angles',
         'same_side_interior': 'Same-Side Interior Angles'
+    };
+
+    // Dictionary of all valid angle pairs for each relationship type
+    const pairMap = {
+        'vertical': ['AC', 'BD', 'EG', 'FH'],
+        'linear': ['AB', 'AD', 'BC', 'CD', 'EF', 'EH', 'FG', 'GH'],
+        'corresponding': ['AE', 'BF', 'CG', 'DH'],
+        'alternate_interior': ['CE', 'DF'],
+        'same_side_interior': ['CF', 'DE']
     };
 
     function getRandomInt(min, max) {
@@ -299,42 +308,49 @@
         return { type, anglesData };
     }
 
-    function getRelationship(id1, id2) {
-        const pair = [id1, id2].sort().join('');
-        
-        if (['AC', 'BD', 'EG', 'FH'].includes(pair)) return 'vertical';
-        if (['AB', 'AD', 'BC', 'CD', 'EF', 'EH', 'FG', 'GH'].includes(pair)) return 'linear';
-        if (['AE', 'BF', 'CG', 'DH'].includes(pair)) return 'corresponding';
-        if (['CE', 'DF'].includes(pair)) return 'alternate_interior';
-        if (['CF', 'DE'].includes(pair)) return 'same_side_interior';
-        
-        return null;
-    }
-
     function generateProblem() {
         feedbackEl.className = 'feedback';
         degreeInput.value = '';
         relSelect.value = '';
         
-        const type = getRandomInt(0, 2);
+        // 1. Pick target relationship FIRST (Equal 20% weight for each)
+        const allRels = ['vertical', 'linear', 'corresponding', 'alternate_interior', 'same_side_interior'];
+        const chosenRel = allRels[getRandomInt(0, allRels.length - 1)];
+
+        // 2. Determine allowed diagram types for this relationship
+        let allowedDiagramTypes = [];
+        if (chosenRel === 'corresponding' || chosenRel === 'alternate_interior' || chosenRel === 'same_side_interior') {
+            allowedDiagramTypes = [1, 2]; // Transversal required
+        } else {
+            // For vertical or linear, filter pairs so Type 0 can only use A, B, C, D
+            allowedDiagramTypes = [0, 1, 2];
+        }
+
+        const type = allowedDiagramTypes[getRandomInt(0, allowedDiagramTypes.length - 1)];
         const data = drawProblem(type);
+
+        // 3. Pick a random pair matching the chosen relationship
+        let availablePairs = pairMap[chosenRel];
+        if (type === 0) {
+            // Filter pairs to only those with letters A, B, C, D
+            availablePairs = availablePairs.filter(p => !p.includes('E') && !p.includes('F') && !p.includes('G') && !p.includes('H'));
+        }
+
+        const chosenPairStr = availablePairs[getRandomInt(0, availablePairs.length - 1)];
         
-        const aIndex = getRandomInt(0, data.anglesData.length - 1);
-        const givenAngle = data.anglesData[aIndex];
-        
-        const validTargets = data.anglesData.filter(t => {
-            if (t.id === givenAngle.id) return false;
-            return getRelationship(givenAngle.id, t.id) !== null;
-        });
-        
-        const targetAngle = validTargets[getRandomInt(0, validTargets.length - 1)];
-        const actualRelId = getRelationship(givenAngle.id, targetAngle.id);
-        
+        // Randomly assign which angle is given and which is target
+        const swap = Math.random() < 0.5;
+        const givenLetter = swap ? chosenPairStr[1] : chosenPairStr[0];
+        const targetLetter = swap ? chosenPairStr[0] : chosenPairStr[1];
+
+        const givenAngle = data.anglesData.find(a => a.id === givenLetter);
+        const targetAngle = data.anglesData.find(a => a.id === targetLetter);
+
         let isDeterminable = true;
         if (type === 2 && givenAngle.group !== targetAngle.group) {
             isDeterminable = false;
         }
-        
+
         currentProblem = {
             type: type,
             givenId: givenAngle.id,
@@ -344,10 +360,10 @@
             targetVal: targetAngle.val,
             targetGroup: targetAngle.group,
             isDeterminable: isDeterminable,
-            actualRelId: actualRelId,
-            logged: false // Prevents multiple submissions counting against stats
+            actualRelId: chosenRel,
+            logged: false
         };
-        
+
         questionEl.textContent = `If m∠${currentProblem.givenId} = ${currentProblem.givenVal}°, what is m∠${currentProblem.targetId}?`;
         lblGiven.textContent = currentProblem.givenId;
         lblTarget.textContent = currentProblem.targetId;
@@ -359,13 +375,12 @@
 
         let relCorrectCount = 0;
         let measCorrectCount = 0;
-        let missedRelationships = {}; // Keep tally of which relationships they missed
+        let missedRelationships = {};
 
         attemptHistory.forEach(attempt => {
             if (attempt.relCorrect) relCorrectCount++;
             if (attempt.measureCorrect) measCorrectCount++;
 
-            // If they missed either the relationship or the measure, add it to the missed tally
             if (!attempt.relCorrect || !attempt.measureCorrect) {
                 missedRelationships[attempt.actualRelId] = (missedRelationships[attempt.actualRelId] || 0) + 1;
             }
@@ -377,7 +392,6 @@
         document.getElementById('stat-rel-acc').textContent = `${relAcc}%`;
         document.getElementById('stat-meas-acc').textContent = `${measAcc}%`;
 
-        // Find the most missed relationship
         let worstRel = null;
         let maxMisses = 0;
 
@@ -472,7 +486,6 @@
         feedbackEl.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
         feedbackEl.innerHTML = message;
 
-        // Log to stats if it's the first time they submit this problem
         if (!currentProblem.logged) {
             currentProblem.logged = true;
             attemptHistory.push({
@@ -481,7 +494,6 @@
                 actualRelId: actualRelId
             });
 
-            // Keep only the last 30 attempts
             if (attemptHistory.length > 30) {
                 attemptHistory.shift(); 
             }
